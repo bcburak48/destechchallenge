@@ -15,12 +15,17 @@ class AssistanceRequestCreateView(APIView):
                 "status": "Created", 
                 "id": assistance_req.id,
             }, status=status.HTTP_201_CREATED)
+        except NotImplementedError:
+            return Response(
+                {"error": "Not implemented"},
+                status=status.HTTP_501_NOT_IMPLEMENTED,
+            )
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class AssistanceRequestCompleteView(APIView):
-    def post(self, request, request_id):
+    def post(self, request_id):
         try:
             AssistanceService.complete_request(request_id)
             return Response({"status": "Completed"}, status=status.HTTP_200_OK)
@@ -31,7 +36,7 @@ class AssistanceRequestCompleteView(APIView):
 
 
 class AssistanceRequestCancelView(APIView):
-    def post(self, request, request_id):
+    def post(self, request_id):
         try:
             AssistanceService.cancel_request(request_id)
             return Response({"status": "Cancelled"}, status=status.HTTP_200_OK)

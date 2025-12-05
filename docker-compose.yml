@@ -1,1 +1,74 @@
-# TODO: Docker Compose yapılandırmasını oluşturun
+version: "3.9"
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: destecht_db
+    environment:
+      POSTGRES_DB: destecht
+      POSTGRES_USER: destecht
+      POSTGRES_PASSWORD: destecht
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: destecht_redis
+    ports:
+      - "6379:6379"
+
+  web:
+    build: .
+    container_name: destecht_web
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings
+      POSTGRES_DB: destecht
+      POSTGRES_USER: destecht
+      POSTGRES_PASSWORD: destecht
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  worker:
+    build: .
+    container_name: destecht_worker
+    command: celery -A config worker -l info
+    volumes:
+      - .:/app
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings
+      POSTGRES_DB: destecht
+      POSTGRES_USER: destecht
+      POSTGRES_PASSWORD: destecht
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+volumes:
+  postgres_data:
